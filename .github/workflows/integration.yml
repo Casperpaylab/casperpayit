@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test --silent
+
+  integration:
+    name: CEP-18 Integration (gated)
+    runs-on: ubuntu-latest
+    # Only run when a recognized set of repository secrets required for the integration are present.
+    # Accepts either the original secret names or alternate names used in local .env (CEP18_TOKEN_CONTRACT, CSPR_CLOUD_ACCESS_TOKEN, AGENT_PRIVATE_KEY, etc.)
+    if: ${{ (secrets.OPERATOR_PRIVATE_KEY || secrets.AGENT_PRIVATE_KEY) && (secrets.OPERATOR_PUBLIC_KEY || secrets.AGENT_PUBLIC_KEY || secrets.PAY_TO_ADDRESS) && (secrets.TOKEN_CONTRACT_HASH || secrets.CEP18_TOKEN_CONTRACT) && (secrets.CSPR_NODE_RPC || secrets.CSPR_CLOUD_ACCESS_TOKEN) && (secrets.TEST_TARGET_PUBLIC_KEY || secrets.PAY_TO_ADDRESS) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - run: npm ci
+      - name: Run gated CEP-18 integration test
+        env:
+          OPERATOR_PRIVATE_KEY: ${{ secrets.OPERATOR_PRIVATE_KEY || secrets.AGENT_PRIVATE_KEY }}
+          OPERATOR_PUBLIC_KEY: ${{ secrets.OPERATOR_PUBLIC_KEY || secrets.AGENT_PUBLIC_KEY || secrets.PAY_TO_ADDRESS }}
+          TOKEN_CONTRACT_HASH: ${{ secrets.TOKEN_CONTRACT_HASH || secrets.CEP18_TOKEN_CONTRACT }}
+          CSPR_NODE_RPC: ${{ secrets.CSPR_NODE_RPC || secrets.CSPR_CLOUD_ACCESS_TOKEN }}
+          TEST_TARGET_PUBLIC_KEY: ${{ secrets.TEST_TARGET_PUBLIC_KEY || secrets.PAY_TO_ADDRESS }}
+          TEST_TRANSFER_AMOUNT: ${{ secrets.TEST_TRANSFER_AMOUNT }}
+        run: |
+          echo "Running integration test (gated)"
+          INTEGRATION=1 npm test -- test/cep18.integration.test.js
