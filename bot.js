@@ -84,6 +84,20 @@ function answerButtons() {
   return Markup.inlineKeyboard([[Markup.button.callback('🏠 Main Menu', 'main_menu')]]);
 }
 
+function invoiceButtons(invoice) {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback('📋 Copy payment address', `copy_payment:${invoice.id}`)],
+    [Markup.button.callback('🏠 Main Menu', 'main_menu')],
+  ]);
+}
+
+function walletButtons(wallet) {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback('📋 Copy wallet address', `copy_wallet:${wallet.address}`)],
+    [Markup.button.callback('🏠 Main Menu', 'main_menu')],
+  ]);
+}
+
 async function safeAnswerCbQuery(ctx) {
   try {
     await ctx.answerCbQuery();
@@ -150,7 +164,7 @@ async function showAddMoney(ctx) {
     `Use this Casper account hash to receive CSPR payments:\n` +
     `${activeWallet.address}\n\n` +
     `This is your self-custodial deposit address. Funds sent here belong only to you.`,
-    answerButtons()
+    walletButtons(activeWallet)
   );
 }
 
@@ -251,6 +265,31 @@ bot.action('switch_to_personal', async (ctx) => {
   await showHome(ctx);
 });
 
+bot.action(/copy_payment:(.+)/, async (ctx) => {
+  await safeAnswerCbQuery(ctx);
+  const invoiceId = ctx.match?.[1];
+  const invoice = getInvoice(invoiceId);
+  if (!invoice) {
+    return ctx.reply('Invoice not found. Please try again.', answerButtons());
+  }
+  await ctx.reply(
+    `📋 Invoice payment address:\n${invoice.paymentAddress}`,
+    Markup.inlineKeyboard([[Markup.button.callback('🏠 Main Menu', 'main_menu')]])
+  );
+});
+
+bot.action(/copy_wallet:(.+)/, async (ctx) => {
+  await safeAnswerCbQuery(ctx);
+  const walletAddress = ctx.match?.[1];
+  if (!walletAddress) {
+    return ctx.reply('Wallet address not found. Please try again.', answerButtons());
+  }
+  await ctx.reply(
+    `📋 Wallet address:\n${walletAddress}`,
+    Markup.inlineKeyboard([[Markup.button.callback('🏠 Main Menu', 'main_menu')]])
+  );
+});
+
 bot.command('newaccount', async (ctx) => {
   const owner = userKey(ctx);
   await ctx.reply(
@@ -306,7 +345,7 @@ bot.command('invoice', async (ctx) => {
     const wallet = getActiveOrPersonalWallet(owner);
     const invoice = createHDInvoice(wallet, { amount, description });
     saveInvoice(invoice);
-    return ctx.reply(`✅ Invoice created.\n\n${formatInvoice(invoice)}`, answerButtons());
+    return ctx.reply(`✅ Invoice created.\n\n${formatInvoice(invoice)}`, invoiceButtons(invoice));
   }
   setSession(owner, { type: 'await_invoice' });
   return ctx.reply(
@@ -405,7 +444,7 @@ bot.on('text', async (ctx) => {
         const wallet = getActiveOrPersonalWallet(owner);
         const invoice = createHDInvoice(wallet, { amount, description });
         saveInvoice(invoice);
-        return ctx.reply(`✅ Invoice created.\n\n${formatInvoice(invoice)}`, answerButtons());
+        return ctx.reply(`✅ Invoice created.\n\n${formatInvoice(invoice)}`, invoiceButtons(invoice));
       }
     }
     if (text.toLowerCase().startsWith('pay ')) {
@@ -434,7 +473,7 @@ bot.on('text', async (ctx) => {
     const invoice = createHDInvoice(wallet, { amount, description });
     saveInvoice(invoice);
     clearSession(owner);
-    return ctx.reply(`✅ Invoice created.\n\n${formatInvoice(invoice)}`, answerButtons());
+    return ctx.reply(`✅ Invoice created.\n\n${formatInvoice(invoice)}`, invoiceButtons(invoice));
   }
 
   if (session.type === 'await_payment') {
