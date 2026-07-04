@@ -63,7 +63,7 @@ The implementation is intentionally lightweight so it can be extended toward the
 ```bash
 npm install
 npm test
-node bot.js
+npm run bot
 ```
 
 Set `BOT_TOKEN` in your environment and start the bot. Then send these commands in Telegram:
@@ -83,6 +83,24 @@ This MVP is the first step toward the full CasPay product brief:
 - invoice issuance with virtual account addresses
 - automated payment status updates
 - a path toward Casper 2.0 transfers and AI-driven command execution
+
+## Railway deployment notes
+
+For Railway, the project uses two services:
+
+- `web` service: `npm run server`
+- `worker` service: `npm run bot`
+
+If Railway supports a Procfile, this repo includes one with both service entries.
+
+Required environment variables:
+
+- `BOT_TOKEN` — Telegram bot token
+- `CASPAY_STATE_FILE` — path to a persistent mounted file, e.g. `/data/.caspay-state.json`
+- `CASPER_NODE_RPC` — optional Casper RPC node URL for invoice settlement
+- `INVOICE_FORWARDING_SECRET` — optional secret to encrypt invoice private keys
+
+> In Railway, set the build command to `npm install` and the start command for the bot service to `npm run bot`. Do not put `npm run bot` in the build step.
 
 ## Notes
 
