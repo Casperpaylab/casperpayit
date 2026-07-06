@@ -1,10 +1,7 @@
 // server/index.js
 //
-// PayIT x402 Demo (v2) — Resource Server, built on official packages.
-//
-// Replaces the earlier hand-rolled Express 402 middleware with the real
-// @x402/express adapter, wired to Casper's official exact-scheme server
-// implementation. This is the "seller" side of the x402 protocol on Casper.
+// CasPay resource server for webhook invoice settlement, payment notification,
+// and x402 facilitator integration.
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -29,14 +26,23 @@ const TOKEN_NAME = process.env.TOKEN_NAME || "USDC";
 const TOKEN_VERSION = process.env.TOKEN_VERSION || "1";
 const PRICE_IN_MOTES = process.env.PRICE_IN_MOTES || "1000000000"; // default: 1 CSPR = 10^9 motes
 
-if (!PAY_TO_ADDRESS) {
-  console.error("[server] PAY_TO_ADDRESS is required and missing in .env. The resource server cannot operate without a payment recipient.");
-  process.exit(1);
-}
+if (process.argv[1] && process.argv[1].endsWith("index.js")) {
+  if (!PAY_TO_ADDRESS) {
+    console.error("[server] PAY_TO_ADDRESS is required and missing in .env. The resource server cannot operate without a payment recipient.");
+    process.exit(1);
+  }
 
-if (!FACILITATOR_USE_STUB && !CSPR_CLOUD_ACCESS_TOKEN) {
-  console.error("[server] CSPR_CLOUD_ACCESS_TOKEN is required unless FACILITATOR_USE_STUB=true.");
-  process.exit(1);
+  if (!FACILITATOR_USE_STUB && !CSPR_CLOUD_ACCESS_TOKEN) {
+    console.error("[server] CSPR_CLOUD_ACCESS_TOKEN is required unless FACILITATOR_USE_STUB=true.");
+    process.exit(1);
+  }
+} else {
+  if (!PAY_TO_ADDRESS) {
+    console.warn("[server] PAY_TO_ADDRESS is not set. Tests or imports will run without a payment recipient.");
+  }
+  if (!FACILITATOR_USE_STUB && !CSPR_CLOUD_ACCESS_TOKEN) {
+    console.warn("[server] CSPR_CLOUD_ACCESS_TOKEN is not set. Set FACILITATOR_USE_STUB=true for tests.");
+  }
 }
 
 if (FACILITATOR_USE_STUB) {
