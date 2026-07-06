@@ -1,7 +1,18 @@
 {
   "name": "casperpay",
   "version": "0.2.0",
-  "description": "PayIT's x402 micropayment demo on Casper Testnet, rebuilt on the official @x402/core, @x402/express, and @make-software/casper-x402 packages.",
+  "description": "CasPay Telegram-native Casper wallet and invoicing platform.",
+  "keywords": [
+    "casper",
+    "telegram",
+    "wallet",
+    "invoicing",
+    "non-custodial",
+    "payments",
+    "x402",
+    "csp",
+    "crypto"
+  ],
   "main": "server/index.js",
   "type": "module",
   "scripts": {
