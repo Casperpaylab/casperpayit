@@ -1,3 +1,7 @@
+// test/webhook.integration.test.js
+//
+// Integration tests for webhook invoice settlement and server API behavior.
+
 import fs from 'fs';
 import path from 'path';
 import request from 'supertest';

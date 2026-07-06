@@ -1,3 +1,7 @@
+// test/caspay.test.js
+//
+// Unit tests for CasPay wallet creation, invoice generation, and reconciliation.
+
 import { createWallet, createInvoice, applyPaymentToInvoice } from '../lib/caspay/core.js';
 
 describe('CasPay wallet and invoice flows', () => {

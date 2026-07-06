@@ -1,3 +1,7 @@
+// test/invoice_listener.integration.test.js
+//
+// Integration tests for the CasPay invoice listener and on-chain settlement flow.
+
 import fs from 'fs';
 import path from 'path';
 import { jest } from '@jest/globals';
