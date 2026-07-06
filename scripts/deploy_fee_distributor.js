@@ -24,6 +24,8 @@ const PRIVATE_KEY_PEM = process.env.FEE_DISTRIBUTOR_OPERATOR_PRIVATE_KEY || proc
 const PRIVATE_KEY_BASE64 = process.env.FEE_DISTRIBUTOR_OPERATOR_PRIVATE_KEY_BASE64 || process.env.OPERATOR_PRIVATE_KEY_BASE64;
 const PRIVATE_KEY_ALGORITHM = process.env.FEE_DISTRIBUTOR_OPERATOR_KEY_ALGORITHM || process.env.OPERATOR_KEY_ALGORITHM;
 const DEFAULT_PAYMENT_AMOUNT = process.env.FEE_DISTRIBUTOR_PAYMENT_AMOUNT || process.env.FEE_DISTRIBUTOR_PAYMENT_AMOUNT_MOTES || '300000000000';
+const SKIP_SIGN = process.argv.includes('--skip-sign') || process.env.SKIP_SIGN === '1' || process.env.SKIP_SIGN === 'true';
+const OPERATOR_PUBLIC_KEY = process.env.FEE_DISTRIBUTOR_OPERATOR_PUBLIC_KEY || process.env.OPERATOR_PUBLIC_KEY;
 
 function fail(message) {
   console.error('ERROR:', message);
@@ -160,10 +162,23 @@ async function main() {
   }
 
   const wasmBytes = fs.readFileSync(WASM_PATH);
-  const privateKeyPem = loadPrivateKeyPem();
-  const keyAlgorithm = getKeyAlgorithm(privateKeyPem);
-  const privateKey = sdk.PrivateKey.fromPem(privateKeyPem, keyAlgorithm);
-  const publicKey = privateKey.publicKey;
+  let privateKey;
+  let publicKey;
+  if (SKIP_SIGN) {
+    if (!OPERATOR_PUBLIC_KEY || OPERATOR_PUBLIC_KEY.trim().length === 0) {
+      fail('Skipping signing requires setting FEE_DISTRIBUTOR_OPERATOR_PUBLIC_KEY (hex public key).');
+    }
+    try {
+      publicKey = sdk.PublicKey.fromHex(OPERATOR_PUBLIC_KEY.trim());
+    } catch (e) {
+      fail(`Failed to parse operator public key: ${e.message || e}`);
+    }
+  } else {
+    const privateKeyPem = loadPrivateKeyPem();
+    const keyAlgorithm = getKeyAlgorithm(privateKeyPem);
+    privateKey = sdk.PrivateKey.fromPem(privateKeyPem, keyAlgorithm);
+    publicKey = privateKey.publicKey;
+  }
 
   const header = sdk.DeployHeader.default();
   header.chainName = CHAIN_NAME;
@@ -189,19 +204,69 @@ async function main() {
   const payment = sdk.ExecutableDeployItem.standardPayment(paymentAmount);
   const deploy = sdk.Deploy.makeDeploy(header, payment, session);
 
-  deploy.sign(privateKey);
-
-  console.log('Submitting fee distributor install deploy...');
+  if (!SKIP_SIGN) {
+    deploy.sign(privateKey);
+    console.log('Signing deploy...');
+    // Optionally write the signed deploy to disk for rebroadcasting
+    if (process.env.WRITE_SIGNED === '1' || process.env.WRITE_SIGNED === 'true') {
+      try {
+        const signedPath = path.resolve(process.cwd(), 'fee_distributor_deploy_signed.json');
+        const deployJson = (typeof deploy.toJSON === 'function') ? deploy.toJSON() : deploy;
+        fs.writeFileSync(signedPath, JSON.stringify(deployJson, null, 2));
+        console.log('Signed deploy written to', signedPath);
+      } catch (e) {
+        console.warn('Failed to write signed deploy to file:', e.message || e);
+      }
+    }
+    console.log('Submitting fee distributor install deploy...');
+    // Optionally rebroadcast the signed deploy to a list of RPC endpoints
+    if (process.env.REBROADCAST_RPCS && process.env.REBROADCAST_RPCS.trim().length > 0) {
+      const list = process.env.REBROADCAST_RPCS.split(',').map(s => s.trim()).filter(Boolean);
+      for (const r of list) {
+        try {
+          const h = new sdk.HttpHandler(r);
+          const rclient = new sdk.RpcClient(h);
+          console.log('Rebroadcasting signed deploy to', r);
+          await rclient.putDeploy(deploy);
+          console.log('Rebroadcast to', r, 'ok');
+        } catch (e) {
+          console.warn('Rebroadcast to', r, 'failed:', e && (e.message || e));
+        }
+      }
+    }
+  } else {
+    console.log('Prepared unsigned fee distributor install deploy (skip-sign).');
+    try {
+      const unsignedPath = path.resolve(process.cwd(), 'fee_distributor_deploy_unsigned.json');
+      const deployJson = (typeof deploy.toJSON === 'function') ? deploy.toJSON() : deploy;
+      fs.writeFileSync(unsignedPath, JSON.stringify(deployJson, null, 2));
+      console.log('Unsigned deploy written to', unsignedPath);
+    } catch (e) {
+      console.warn('Failed to write unsigned deploy to file:', e.message || e);
+    }
+  }
   const handler = new sdk.HttpHandler(NODE_RPC);
   if (CSPR_CLOUD_ACCESS_TOKEN && CSPR_CLOUD_ACCESS_TOKEN.trim().length > 0) {
     handler.setCustomHeaders({ authorization: CSPR_CLOUD_ACCESS_TOKEN });
   }
   const rpc = new sdk.RpcClient(handler);
-  await rpc.putDeploy(deploy);
 
-  const deployHash = (deploy && deploy.hash && typeof deploy.hash.toHex === 'function') ? deploy.hash.toHex() : (deploy && deploy.hash && deploy.hash.hashBytes ? Buffer.from(deploy.hash.hashBytes).toString('hex') : JSON.stringify(deploy && deploy.hash));
-  console.log('Deploy submitted successfully.');
-  console.log('Deploy hash:', deployHash);
+  // Support a dry-run mode that prepares and signs the deploy but does not submit it.
+  // Set `DRY_RUN=1` in the environment to enable.
+  if (process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true') {
+    console.log('DRY RUN enabled — deploy prepared but not submitted.');
+    try {
+      const deployHash = (deploy && deploy.hash && typeof deploy.hash.toHex === 'function') ? deploy.hash.toHex() : (deploy && deploy.hash && deploy.hash.hashBytes ? Buffer.from(deploy.hash.hashBytes).toString('hex') : JSON.stringify(deploy && deploy.hash));
+      console.log('Prepared deploy hash (signed locally):', deployHash);
+    } catch (e) {
+      console.log('Prepared deploy (no signed hash available).');
+    }
+  } else {
+    await rpc.putDeploy(deploy);
+    const deployHash = (deploy && deploy.hash && typeof deploy.hash.toHex === 'function') ? deploy.hash.toHex() : (deploy && deploy.hash && deploy.hash.hashBytes ? Buffer.from(deploy.hash.hashBytes).toString('hex') : JSON.stringify(deploy && deploy.hash));
+    console.log('Deploy submitted successfully.');
+    console.log('Deploy hash:', deployHash);
+  }
   console.log('Fee distributor wasm:', WASM_PATH);
   console.log('Payment amount (motes):', paymentAmount);
   console.log('Fee receiver address:', OWNER_ADDRESS);

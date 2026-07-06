@@ -69,40 +69,7 @@ const facilitatorClient = new HTTPFacilitatorClient({
   }),
 });
 
-// Build the core resource server and register Casper's official exact-scheme
-// implementation for both testnet and mainnet network identifiers.
-// Guard the construction so importing this module in tests (where some
-// dependencies or globals may not be present) does not throw.
-let resourceServer = null;
-try {
-  if (typeof x402ResourceServer !== 'undefined') {
-    resourceServer = new x402ResourceServer(facilitatorClient);
-    registerExactCasperScheme(resourceServer);
-  } else {
-    // Attempt to require from @x402/core if available
-    try {
-      const core = await import('@x402/core');
-      const X = core?.x402ResourceServer || core?.ResourceServer || null;
-      if (X) {
-        resourceServer = new X(facilitatorClient);
-        registerExactCasperScheme(resourceServer);
-      }
-    } catch (e) {
-      console.warn('[server] x402 resource server unavailable in this environment; continuing with middleware disabled for tests.');
-    }
-  }
-} catch (err) {
-  console.warn('[server] Failed to construct x402 resource server (tests mode):', err?.message || err);
-}
-
 // Route configuration: what we charge for /market-data.
-// extra.name and extra.version are required by Casper's official scheme:
-// they build the EIP-712 domain separator for the token, and must match
-// the token's actual on-chain name. version defaults to "1" unless the
-// token contract specifies otherwise.
-// Route configuration: what we charge for /market-data.
-// Defaults to native CSPR (motes). If TOKEN_CONTRACT_HASH is set, the demo
-// switches to stablecoin payment via the specified Casper token contract.
 const routes = {
   "/market-data": {
     accepts: {
@@ -130,12 +97,46 @@ const routes = {
     resource: "/market-data",
     description: TOKEN_CONTRACT_HASH
       ? "Sample market data endpoint, paid per-request in stablecoin on Casper Testnet"
-      : "Sample market data endpoint, paid per-request in native CSPR via x402 on Casper Testnet",
+      : "Sample market data endpoint, paid in native CSPR via x402 on Casper Testnet",
   },
 };
 
-// Use the centralized wrapper to create the middleware
-app.use(createX402Middleware({ facilitatorClient, routes }));
+const x402Middleware = await (async () => {
+  if (!FACILITATOR_USE_STUB && !CSPR_CLOUD_ACCESS_TOKEN) {
+    console.warn('[server] x402 middleware disabled because CSPR_CLOUD_ACCESS_TOKEN is missing and FACILITATOR_USE_STUB is false.');
+    return (req, res, next) => next();
+  }
+
+  let resourceServer = null;
+  try {
+    if (typeof x402ResourceServer !== 'undefined') {
+      resourceServer = new x402ResourceServer(facilitatorClient);
+      registerExactCasperScheme(resourceServer);
+    } else {
+      try {
+        const core = await import('@x402/core');
+        const X = core?.x402ResourceServer || core?.ResourceServer || null;
+        if (X) {
+          resourceServer = new X(facilitatorClient);
+          registerExactCasperScheme(resourceServer);
+        }
+      } catch (e) {
+        console.warn('[server] x402 resource server unavailable in this environment; continuing with middleware disabled for tests.');
+      }
+    }
+  } catch (err) {
+    console.warn('[server] Failed to construct x402 resource server (tests mode):', err?.message || err);
+  }
+
+  if (!resourceServer) {
+    return (req, res, next) => next();
+  }
+
+  return createX402Middleware({ facilitatorClient, routes });
+})();
+
+app.use(x402Middleware);
+
 
 /**
  * The data we actually sell. In a real product this would be a live data
