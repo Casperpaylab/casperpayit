@@ -158,32 +158,28 @@ Tests cover:
 - Partial payment handling
 - State persistence
 
-## Project Structure
+## Repository structure
 
-```
-.
-├── bot.js                          # Telegram bot entry point
-├── package.json                    # Dependencies and scripts
-├── Procfile                        # Railway deployment configuration
-├── README.md                       # This file
-├── lib/
-│   ├── caspay/
-│   │   ├── core.js                # Core wallet & invoice logic
-│   │   ├── gateway.js             # Casper blockchain interface
-│   │   ├── invoice_listener.js    # Payment listener service
-│   │   └── state.js               # Local state management
-│   └── x402/
-│       └── wrapper.js             # x402 protocol wrapper
-├── server/
-│   └── index.js                   # Webhook and API server
-├── test/
-│   ├── caspay.test.js            # Core functionality tests
-│   ├── cep18.integration.test.js  # Token integration tests
-│   ├── webhook.integration.test.js # Webhook tests
-│   └── ...                        # Additional test suites
-└── contracts/
-    └── fee_distributor/          # Smart contract for fee distribution
-```
+This section lists the most important root files and directories, with a short description of their role in the CasPay product.
+
+- `bot.js` — Telegram bot entry point for wallet creation, invoice commands, payment status, and user interactions.
+- `server/index.js` — API and webhook server that accepts payment settlement events and exposes integration endpoints.
+- `lib/caspay/core.js` — core wallet, invoice, and reconciliation logic.
+- `lib/caspay/gateway.js` — Casper blockchain helper functions and transfer wrapper.
+- `lib/caspay/invoice_listener.js` — invoice payment listener for on-chain/webhook updates.
+- `lib/caspay/state.js` — file-backed application state persistence for wallets and invoices.
+- `lib/x402/wrapper.js` — adapter layer for x402/Casper protocol utilities.
+- `test/` — end-to-end and unit tests covering wallet flow, invoice handling, webhook integration, and Casper interactions.
+- `contracts/fee_distributor/` — smart contract source, build scripts, and wasm artifacts for fee distribution.
+- `.github/workflows/` — CI workflow definitions used for automated validation and checks.
+- `.gitignore` — repository ignore rules for local state, environment files, and build artifacts.
+- `Procfile` — process definitions for deployments on Railway/Heroku-style platforms.
+- `README.md` — this project overview and usage guide.
+- `SETUP.md` — setup instructions and environment configuration notes.
+- `package.json` / `package-lock.json` — package metadata, scripts, and dependency lockfile.
+- `scripts/` — utility scripts for contract deployment and key derivation.
+- `deploy_result.json` — optional deployment artifact output (should be excluded from production source control if it contains environment-specific details).
+- `secrets/` — local secrets directory, excluded from git by `.gitignore`.
 
 ## Roadmap
 
@@ -213,14 +209,5 @@ MIT
 ---
 
 **Built on Casper Blockchain | Powered by Telegram**
-- `INVOICE_FORWARDING_SECRET` — optional secret to encrypt invoice private keys
 
 > In Railway, set the build command to `npm install` and the start command for the bot service to `npm run bot`. Do not put `npm run bot` in the build step.
-
-## Notes
-
-The original x402 demo server remains available in [server/index.js](server/index.js), but the default bot behavior now focuses on the CasPay experience.
-
-## License
-
-MIT
