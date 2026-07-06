@@ -52,6 +52,15 @@ function loadPrivateKeyPem() {
   fail('Operator private key not configured. Set FEE_DISTRIBUTOR_OPERATOR_PRIVATE_KEY_PATH, OPERATOR_PRIVATE_KEY_PATH, FEE_DISTRIBUTOR_OPERATOR_PRIVATE_KEY, OPERATOR_PRIVATE_KEY, FEE_DISTRIBUTOR_OPERATOR_PRIVATE_KEY_BASE64, or OPERATOR_PRIVATE_KEY_BASE64.');
 }
 
+function tryParsePrivateKey(pem, algorithm) {
+  try {
+    sdk.PrivateKey.fromPem(pem, algorithm);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function getKeyAlgorithm(pem) {
   if (PRIVATE_KEY_ALGORITHM && PRIVATE_KEY_ALGORITHM.trim().length > 0) {
     const normalized = PRIVATE_KEY_ALGORITHM.trim().toUpperCase();
@@ -61,17 +70,32 @@ function getKeyAlgorithm(pem) {
     fail(`Unsupported key algorithm: ${PRIVATE_KEY_ALGORITHM}. Use ED25519 or SECP256K1.`);
   }
 
-  if (pem.trim().startsWith('-----BEGIN EC PRIVATE KEY-----')) {
-    return sdk.KeyAlgorithm.SECP256K1;
-  }
-  if (pem.trim().startsWith('-----BEGIN PRIVATE KEY-----')) {
-    return sdk.KeyAlgorithm.SECP256K1;
-  }
-  if (pem.trim().startsWith('-----BEGIN ED25519 PRIVATE KEY-----')) {
+  const trimmed = pem.trim();
+  if (trimmed.startsWith('-----BEGIN ED25519 PRIVATE KEY-----')) {
     return sdk.KeyAlgorithm.ED25519;
   }
+  if (trimmed.startsWith('-----BEGIN EC PRIVATE KEY-----')) {
+    return sdk.KeyAlgorithm.SECP256K1;
+  }
 
-  return sdk.KeyAlgorithm.SECP256K1;
+  if (trimmed.startsWith('-----BEGIN PRIVATE KEY-----')) {
+    if (tryParsePrivateKey(pem, sdk.KeyAlgorithm.ED25519)) {
+      return sdk.KeyAlgorithm.ED25519;
+    }
+    if (tryParsePrivateKey(pem, sdk.KeyAlgorithm.SECP256K1)) {
+      return sdk.KeyAlgorithm.SECP256K1;
+    }
+    fail('Unable to detect private key algorithm from PKCS#8 PEM. Please set FEE_DISTRIBUTOR_OPERATOR_KEY_ALGORITHM or OPERATOR_KEY_ALGORITHM.');
+  }
+
+  if (tryParsePrivateKey(pem, sdk.KeyAlgorithm.ED25519)) {
+    return sdk.KeyAlgorithm.ED25519;
+  }
+  if (tryParsePrivateKey(pem, sdk.KeyAlgorithm.SECP256K1)) {
+    return sdk.KeyAlgorithm.SECP256K1;
+  }
+
+  fail('Unable to detect private key algorithm. Set FEE_DISTRIBUTOR_OPERATOR_KEY_ALGORITHM or OPERATOR_KEY_ALGORITHM to ED25519 or SECP256K1.');
 }
 
 function makeKey(value, forceAccount = false) {

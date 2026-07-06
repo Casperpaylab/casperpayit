@@ -134,6 +134,7 @@ npm run bot
 | `CASPAY_STATE_FILE` | Path to persistent state file | `/data/.caspay-state.json` |
 | `CASPER_NODE_RPC` | Casper node RPC endpoint | `https://rpc.testnet.casperlabs.io` |
 | `INVOICE_FORWARDING_SECRET` | Encryption key for invoice private keys | `your-secret-key` |
+| `FEE_DISTRIBUTOR_OPERATOR_KEY_ALGORITHM` | Operator key type for contract signing | `ED25519` |
 | `CASPER_USE_TRANSFER_SCAN` | Enable block scanning for payments | `true` |
 | `CASPER_SCAN_LOOKBACK` | Number of blocks to scan | `100` |
 
