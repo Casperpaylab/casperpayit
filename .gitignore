@@ -16,3 +16,12 @@ coverage/
 contracts/**/target/
 contracts/**/cargo_check_output.txt
 contracts/**/rust_toolchain_install.log
+
+# Fee distributor deploy artifacts (signed/unsigned) - should not be committed
+fee_distributor_deploy_*.json
+fee_distributor_deploy_signed.json
+fee_distributor_deploy_unsigned.json
+
+# Deploy artifacts and local state
+deploy_result.json
+.caspay-state.json
