@@ -1,4 +1,14 @@
 node_modules/
 .env
+.env.example
+.env.local
 *.log
 .DS_Store
+.caspay-state.json
+deploy_result.json
+secrets/
+*.swp
+*.swo
+.idea/
+.vscode/
+coverage/
